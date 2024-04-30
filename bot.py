@@ -5,6 +5,7 @@ import datetime
 bot = telebot.TeleBot('token')
 
 users = {}
+record = {}
 hide_markup = telebot.types.ReplyKeyboardRemove()
 
 def main_menu():
@@ -17,7 +18,7 @@ def main_menu():
 # обработка команды start
 @bot.message_handler(commands=['start'])
 def react_command_start(message):
-    bot.send_message(message.from_user.id, f'Привет, {message.from_user.first_name} {message.from_user.last_name}! Я бот, я готов к работе', reply_markup=main_menu())
+    bot.send_message(message.from_user.id, f'Привет, {message.from_user.first_name}! Я бот, я готов к работе', reply_markup=main_menu())
 
 def all_commands(answer):
     if answer.text == "/start":
@@ -34,10 +35,12 @@ def all_commands(answer):
         react_command_predict(answer)
     elif answer.text == "/all_users":
         react_command_all_users(answer)
+    elif answer.text == "/dairy":
+        react_command_dairy(answer)
     elif answer.text == "возврат в меню":
         react_command_start(answer)
     else:
-        bot.send_message(answer.from_user.id, answer.text)
+        bot.send_message(answer.from_user.id, "Команда не существует")
 
 # обработка команды name, внесение в базу данных о пользователях
 @bot.message_handler(commands=['name'])
@@ -54,7 +57,7 @@ def after_name(answer):
         try:
             data = users[answer.from_user.id]
         except:
-            users[answer.from_user.id] = {'user_name': None, 'user_age': None}
+            users[answer.from_user.id] = {'user_name': None, 'user_age': None, 'user_dairy': []}
         finally:
             name = answer.text
             users[answer.from_user.id]['user_name'] = name
@@ -96,16 +99,74 @@ def react_command_all_users(message):
         try:
             user_name = users[message.from_user.id]["user_name"]
             user_age = users[message.from_user.id]["user_age"]
-            bot.send_message(message.from_user.id, f'Ваши данныe: {user_name}: {user_age}')
+            user_dairy = users[message.from_user.id]["user_dairy"]
+            bot.send_message(message.from_user.id, f'Ваши данныe: {user_name}, {user_age}')
+            if len(users[message.from_user.id]['user_dairy']) > 0:
+                dairy_data = pd.DataFrame(user_dairy)
+                bot.send_message(message.from_user.id, ' '.join(dairy_data.columns.to_list()))
+                bot.send_message(message.from_user.id, dairy_data.to_string(header=False, index=False))
+            else:
+                bot.send_message(message.from_user.id, 'Ваш дневник пуст', reply_markup=main_menu())
         except:
-            bot.send_message(message.from_user.id, f'Кажется, вас нет в базе (но есть кто-то другой).\nВыберите сначала команду /name')
-        finally:
-            bot.send_message(message.from_user.id, 'Все пользователи')
-            for elem in users:
-                elem_data = users[elem]
-                bot.send_message(message.from_user.id, f'ID {elem}: {elem_data["user_name"]}, {elem_data["user_age"]}')
+            bot.send_message(message.from_user.id, f'Ваши данные отсутствуют в базе.\nВыберите сначала команду /name')
+        # finally:
+        #     bot.send_message(message.from_user.id, 'Все пользователи')
+        #     for elem in users:
+        #         elem_data = users[elem]
+        #         bot.send_message(message.from_user.id, f'ID {elem}: {elem_data["user_name"]}, {elem_data["user_age"]}')
     else:
         bot.send_message(message.from_user.id, f'В базе нет данных')
+
+# обработка команды dairy
+@bot.message_handler(commands=['dairy'])
+def react_command_dairy(message):
+    global record
+    try:
+        data = users[message.from_user.id] 
+    except:
+        bot.send_message(message.from_user.id, 'Кажется, вас нет в базе. Выберите сначала команду /name')   
+    else:
+        bot.send_message(message.from_user.id, "Давайте запишем ваши данные в дневник", reply_markup=hide_markup)
+        record = {'date': None, 'pressure': None, 'temperature': None}
+        date = bot.send_message(message.from_user.id, "Введите дату записи в формате 'dd.mm.yyyy'")
+        bot.register_next_step_handler(date, after_dairy_date)
+
+def after_dairy_date(answer):
+    global users
+    global record
+    if answer.text.startswith('/'):
+        bot.send_message(answer.from_user.id, "Некорректный формат ввода, повторите ввод")
+        date = bot.send_message(answer.from_user.id, "Введите дату записи в формате 'dd.mm.yyyy'")
+        bot.register_next_step_handler(date, after_dairy_date)
+    else:
+        record['date'] = answer.text
+        pressure = bot.send_message(answer.from_user.id, "Введите показатели вашего давления (через слэш и без пробела, пример: 120/80)'")
+        bot.register_next_step_handler(pressure, after_dairy_pressure)
+
+def after_dairy_pressure(answer):
+    global users
+    global record
+    if answer.text.startswith('/'):
+        bot.send_message(answer.from_user.id, "Некорректный формат ввода, повторите ввод")
+        pressure = bot.send_message(answer.from_user.id, "Введите показатели вашего давления (через слэш и без пробела, пример: 120/80)'")
+        bot.register_next_step_handler(pressure, after_dairy_pressure)
+    else:
+        record['pressure'] = answer.text
+        temperature = bot.send_message(answer.from_user.id, "Введите вашу температуру (пример: 36.5)")
+        bot.register_next_step_handler(temperature, after_dairy_temperature)
+
+def after_dairy_temperature(answer):
+    global users
+    global record
+    if answer.text.startswith('/'):
+        bot.send_message(answer.from_user.id, "Некорректный формат ввода, повторите ввод")
+        temperature = bot.send_message(answer.from_user.id, "Введите вашу температуру (пример: 36.5)")
+        bot.register_next_step_handler(temperature, after_dairy_temperature)
+    else:
+        record['temperature'] = answer.text
+        users[answer.from_user.id]['user_dairy'].append(record)
+        record = {}
+        bot.send_message(answer.from_user.id, "Данные успешно внесены", reply_markup=main_menu())
 
 # обработка команды help
 @bot.message_handler(commands=['help'])
@@ -116,7 +177,8 @@ def react_command_help(message):
             '/start - возврат в главное меню\n',
             '/predict - предсказать возраст\n',
             '/minigame - игра "Бот угадывает число"\n',
-            '/all_users - список пользователей бота\n']
+            '/all_users - список пользователей бота\n',
+            '/dairy - добавить запись в дневник']
     bot.send_message(message.from_user.id, ''.join(text))
 
 # обработка команды predict
@@ -202,8 +264,9 @@ def after_start(answer):
         btn5 = telebot.types.KeyboardButton("/name")
         btn6 = telebot.types.KeyboardButton("/predict")
         btn7 = telebot.types.KeyboardButton("/all_users")
+        btn8 = telebot.types.KeyboardButton("/dairy")
         back = telebot.types.KeyboardButton("возврат в меню")
-        markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, back)
+        markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, back)
         bot.send_message(answer.from_user.id, "Вот весь список функций", reply_markup=markup)
     
     elif answer.text == "возврат в меню":
