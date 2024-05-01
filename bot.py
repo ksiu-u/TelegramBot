@@ -1,6 +1,7 @@
 import telebot
 import random 
 import datetime
+import pandas as pd
 
 bot = telebot.TeleBot('token')
 
@@ -33,8 +34,8 @@ def all_commands(answer):
         react_command_name(answer)
     elif answer.text == "/predict":
         react_command_predict(answer)
-    elif answer.text == "/all_users":
-        react_command_all_users(answer)
+    elif answer.text == "/user_dairy":
+        react_command_user_dairy(answer)
     elif answer.text == "/dairy":
         react_command_dairy(answer)
     elif answer.text == "возврат в меню":
@@ -92,9 +93,9 @@ def after_age(answer):
             else:
                 bot.register_next_step_handler(after_age_answer, after_age)
 
-# обработка команды all_users
-@bot.message_handler(commands=['all_users'])
-def react_command_all_users(message):
+# обработка команды user_dairy
+@bot.message_handler(commands=['user_dairy'])
+def react_command_user_dairy(message):
     if len(users) > 0:
         try:
             user_name = users[message.from_user.id]["user_name"]
@@ -177,7 +178,7 @@ def react_command_help(message):
             '/start - возврат в главное меню\n',
             '/predict - предсказать возраст\n',
             '/minigame - игра "Бот угадывает число"\n',
-            '/all_users - список пользователей бота\n',
+            '/user_dairy - список пользователей бота\n',
             '/dairy - добавить запись в дневник']
     bot.send_message(message.from_user.id, ''.join(text))
 
@@ -263,7 +264,7 @@ def after_start(answer):
         btn4 = telebot.types.KeyboardButton("/age")
         btn5 = telebot.types.KeyboardButton("/name")
         btn6 = telebot.types.KeyboardButton("/predict")
-        btn7 = telebot.types.KeyboardButton("/all_users")
+        btn7 = telebot.types.KeyboardButton("/user_dairy")
         btn8 = telebot.types.KeyboardButton("/dairy")
         back = telebot.types.KeyboardButton("возврат в меню")
         markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, back)
